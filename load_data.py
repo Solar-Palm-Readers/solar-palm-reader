@@ -71,11 +71,12 @@ def to_pandas(dat: pycdf.CDF) -> pd.DataFrame:
     return df
 
 
-def load_dataframe(date: datetime) -> pd.DataFrame:
-    dscovr_file = get_file_dscovr(date)
-    df = to_pandas(dscovr_file)
-    dscovr_file.close()
+def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
+    dat_file = get_file(dataset, date)
+    df = to_pandas(dat_file)
+    dat_file.close()
     return df
+
 
 def validate_data(dat):  # not finished
     validate_vector = np.zeros_like(dat['B1F1'])
@@ -104,4 +105,5 @@ if __name__ == '__main__':
     # wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
 
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
-    pass
+    df = load_dataframe(datetime(year=2022, month=1, day=1))
+    print('hi')
