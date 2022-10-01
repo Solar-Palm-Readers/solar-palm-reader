@@ -39,8 +39,25 @@ def get_file_wind_mfi(date: datetime) -> pycdf.CDF:
 def get_file_wind_swe(date: datetime) -> pycdf.CDF:
     return get_file("wind swe", date)
 
+def display_columns(dat_files: list, metadata: bool = False):
+    for f in dat_files:
+        print(f.attrs['Descriptor'])
+        for i in f.keys():
+            try:
+                info = f[i].attrs['CATDESC']
+            except:
+                info = f[i].attrs['FIELDNAM']
+            if not metadata:
+                if f[i].attrs['VAR_TYPE'] == 'metadata':
+                    continue
+            print(i, info, f[i].shape)
+
 
 if __name__ == '__main__':
-    cdf_file = get_file_dscovr(datetime(year=2022, month=1, day=1))
+    dscovr_file = get_file_dscovr(datetime(year=2022, month=1, day=1))
+    wind_mfi_file = get_file_wind_mfi(datetime(year=2022, month=1, day=1))
+    wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
 
-    print(cdf_file)
+    display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
+
+
