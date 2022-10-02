@@ -60,7 +60,7 @@ def to_pandas(dat: pycdf.CDF) -> pd.DataFrame:
     df = pd.DataFrame()
     for k in dat.keys():
         col = dat[k]
-        if col.attrs['VAR_TYPE'] == 'metadata':
+        if col.attrs['VAR_TYPE'] == 'metadata' or col.shape[0] == 1440:
             continue
         if col[:].ndim > 1:
             for c in range(col.shape[-1]):
@@ -105,5 +105,5 @@ if __name__ == '__main__':
     # wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
 
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
-    df = load_dataframe(datetime(year=2022, month=1, day=1))
+    df = load_dataframe('dscovr', datetime(year=2022, month=1, day=1))
     print('hi')
