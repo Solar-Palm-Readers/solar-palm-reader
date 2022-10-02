@@ -28,7 +28,7 @@ def get_file(dataset: str, date: datetime) -> xr.Dataset:
 
     file_name = str.format(file_template, date_string=date_to_string(date))
     full_file_path = os.path.join(data_root, dataset.lower(), file_name)
-    return cdf_to_xarray(full_file_path, to_datetime=True, fillval_to_nan=True)
+    return cdf_to_xarray(full_file_path, to_datetime=True, fillval_to_nan=False)
 
 
 def get_file_dscovr(date: datetime) -> xr.Dataset:
@@ -57,20 +57,16 @@ def display_columns(dat_files: list, metadata: bool = False) -> None:
             print(i, info, f[i].shape)
 
 
-def to_pandas(dataset: str, dat: xr.Dataset) -> pd.DataFrame:
+def to_pandas(dat: xr.Dataset, columns: list, validate_vector: np.ndarray) -> pd.DataFrame:
     df = pd.DataFrame()
-    for k in dat.keys():
-        col = dat[k]
-        if col.attrs['VAR_TYPE'] == 'metadata':
-            continue
-        if dataset.lower() == "wind mfi" and k != 'Epoch Time' and k != 'BF1' and k != 'BGSE':
-            continue
+    for col_name in columns:
+        col = dat[col_name]
         if col.data.ndim > 1:
             for c in range(col.shape[-1]):
-                df[f'{k}_{c}'] = col.data[:, c]
+                df[f'{col_name}_{c}'] = col.data[:, c]
         else:
-            df[k] = col.data
-
+            df[col_name] = col.data
+    df['validate_vector'] = ~validate_vector
     return df
 
 
@@ -87,32 +83,64 @@ def add_epoch(dataset: str, df: pd.DataFrame, dat: xr.Dataset) -> None:
 
 def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
     dat_file = get_file(dataset, date)
-    df = to_pandas(dataset, dat_file)
+    columns = select_columns(dataset)
+    validate_vector = get_validate_vector(dataset, dat_file, columns)
+    df = to_pandas(dat_file, columns, validate_vector)
     add_epoch(dataset, df, dat_file)
     dat_file.close()
     return df
 
 
-def validate_data(dat):  # not finished
-    validate_vector = np.zeros_like(dat['B1F1'])
-    for k in dat.keys():
-        col = dat[k]
-        if col.attrs['VAR_TYPE'] == 'metadata':
-            continue
+def select_columns(dataset: str) -> list:
+    if dataset.lower() == "dscovr":
+        columns = ['B1F1', 'B1SDF1', 'B1GSE', 'B1SDGSE']
+    elif dataset.lower() == "wind mfi":
+        columns = ['BF1', 'BGSE']
+    elif dataset.lower() == "wind swe":
+        columns = ['Proton_VX_nonlin', 'Proton_VY_nonlin', 'Proton_VZ_nonlin', 'Proton_W_nonlin', 'Proton_Np_nonlin']
+    else:
+        raise ValueError('Unknown Dataset')
+
+    return columns
+
+
+def create_validate_vector(dataset: str, dat: xr.Dataset) -> np.ndarray:
+    if dataset.lower() == "dscovr":
+        validate_vector = np.zeros_like(dat['B1F1'])
+    elif dataset.lower() == "wind mfi":
+        validate_vector = np.zeros_like(dat['BF1'])
+    elif dataset.lower() == "wind swe":
+        validate_vector = np.zeros_like(dat['Proton_VX_nonlin'])
+    else:
+        raise ValueError('Unknown Dataset')
+
+    return validate_vector
+
+
+def get_validate_vector(dataset: str, dat: xr.Dataset, columns: list) -> np.array:
+    validate_vector = create_validate_vector(dataset, dat)
+    for col_name in columns:
+        col = dat[col_name]
         fill_val = col.attrs['FILLVAL']
         max_val = col.attrs['VALIDMAX']
         min_val = col.attrs['VALIDMIN']
-        if col[:].ndim > 1:
+        if col.ndim > 1:
             valid = np.logical_or(
-                np.sum(col[:] > max_val, axis=1), np.sum(col[:] == fill_val, axis=1))
-            valid = np.logical_or(valid, np.sum(col[:] < min_val, axis=1))
-            validate_vector = np.logical_or(valid, validate_vector)
+                np.sum(col.data > max_val, axis=1), np.sum(col.data == fill_val, axis=1))
+            valid = np.logical_or(valid, np.sum(col.data < min_val, axis=1))
         else:
-            valid = np.logical_or(col[:] > max_val, col[:] == fill_val)
-            valid = np.logical_or(valid, col[:] < min_val)
-            validate_vector = np.logical_or(valid, validate_vector)
+            valid = np.logical_or(col.data > max_val, col.data == fill_val)
+            valid = np.logical_or(valid, col.data < min_val)
+        validate_vector = np.logical_or(valid, validate_vector)
 
-        return np.sum(validate_vector)
+    return validate_vector
+
+
+def filter_data(df: pd.DataFrame) -> pd.DataFrame:
+    df = df[df['validate_vector']]
+    df = df.drop('validate_vector', axis=1)
+
+    return df
 
 
 if __name__ == '__main__':
