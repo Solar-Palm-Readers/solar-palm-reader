@@ -1,4 +1,6 @@
 /data/dscovr/*
+/data/dscovr fc0/*
+/data/dscovr fc1/*
 /data/wind mfi/*
 /data/wind swe/*
 /venv
