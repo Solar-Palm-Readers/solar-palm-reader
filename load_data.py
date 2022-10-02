@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -143,10 +143,20 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime) -> pd.DataFrame:
+    date = start_date
+    df = pd.DataFrame()
+    while date < stop_date:
+        new_df = load_dataframe(dataset, date)
+        df = pd.concat([df, new_df])
+        date = date + timedelta(days=1)
+    return df
+
+
 if __name__ == '__main__':
     # wind_mfi_file = get_file_wind_mfi(datetime(year=2022, month=1, day=1))
     # wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
 
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
-    df1 = load_dataframe('dscovr', datetime(year=2022, month=1, day=1))
-    print('hi')
+    df1 = load_multiple_files('dscovr', datetime(year=2022, month=1, day=1), datetime(year=2022, month=1, day=3))
+
