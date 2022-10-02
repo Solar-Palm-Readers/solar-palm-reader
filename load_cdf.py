@@ -76,7 +76,7 @@ def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
     df = to_pandas(dat_file, columns, validate_vector)
     add_epoch(dataset, df, dat_file)
     dat_file.close()
-    return df
+    return filter_data(df)
 
 
 def select_columns(dataset: str) -> list:
@@ -135,6 +135,7 @@ def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime)
     date = start_date
     df = pd.DataFrame()
     while date < stop_date:
+        print(date)
         new_df = load_dataframe(dataset, date)
         df = pd.concat([df, new_df])
         date = date + timedelta(days=1)
@@ -142,9 +143,21 @@ def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime)
 
 
 if __name__ == '__main__':
-    # wind_mfi_file = get_file_wind_mfi(datetime(year=2022, month=1, day=1))
-    # wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
-
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
-    df1 = load_multiple_files('dscovr', datetime(year=2022, month=1, day=1), datetime(year=2022, month=1, day=3))
 
+    df = load_multiple_files('dscovr', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
+    df.to_csv(os.path.join(data_root, 'dscovr_jan'))
+
+    df = load_multiple_files('wind swe', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
+    df.to_csv(os.path.join(data_root, 'wind_swe_jan'))
+
+    # df = load_multiple_files('wind mfi', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
+    # df.to_csv(os.path.join(data_root, 'wind_mfi_jan'))
+
+    """
+    df = load_multiple_files('dscovr fc0', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
+    df.to_csv(os.path.join(data_root, 'dscovr_fc0_jan'))
+
+    df = load_multiple_files('dscovr fc1', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
+    df.to_csv(os.path.join(data_root, 'dscovr_fc1_jan'))
+    """
