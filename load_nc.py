@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import xarray as xr
-from cdflib import cdf_to_xarray
 from scipy.io import netcdf
 
 data_root = r'data'
@@ -31,7 +30,7 @@ def get_file(dataset: str, date: datetime) -> xr.Dataset:
     full_file_path = os.path.join(data_root, dataset.lower(), file_name)
 
     if not with_wildcard:
-        return cdf_to_xarray(full_file_path, to_datetime=True, fillval_to_nan=True)
+        return netcdf.NetCDFFile(full_file_path, 'r')
     else:
         full_file_path = glob.glob(full_file_path)[0]
         return netcdf.NetCDFFile(full_file_path, 'r')
@@ -94,9 +93,15 @@ def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime)
 
 
 if __name__ == '__main__':
-    # wind_mfi_file = get_file_wind_mfi(datetime(year=2022, month=1, day=1))
-    # wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
-
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
-    df1 = load_multiple_files('dscovr fc0', datetime(year=2022, month=1, day=1), datetime(year=2022, month=1, day=3))
-    print('hi')
+
+    month = 3
+    name = 'mar'
+
+    df = load_multiple_files('dscovr fc0', datetime(year=2022, month=month, day=1),
+                             datetime(year=2022, month=month + 1, day=1))
+    df.to_pickle(os.path.join(data_root, f'dscovr_fc0_{name}.dat'))
+
+    # df = load_multiple_files('dscovr fc1', datetime(year=2022, month=month, day=1),
+    #                          datetime(year=2022, month=month + 1, day=1))
+    # df.to_pickle(os.path.join(data_root, f'dscovr_fc1_{name}.dat'))

@@ -115,6 +115,7 @@ def get_validate_vector(dataset: str, dat: xr.Dataset, columns: list) -> np.arra
         if col.ndim > 1:
             valid = np.logical_or(
                 np.sum(col.data > max_val, axis=1), np.sum(col.data == fill_val, axis=1))
+            valid = np.logical_or(valid, np.sum(col.data == np.nan, axis=1))
             valid = np.logical_or(valid, np.sum(col.data < min_val, axis=1))
         else:
             valid = np.logical_or(col.data > max_val, col.data == fill_val)
@@ -144,20 +145,31 @@ def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime)
 
 if __name__ == '__main__':
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
+    df = load_dataframe('dscovr', datetime(year=2022, month=1, day=1))
 
-    df = load_multiple_files('dscovr', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
-    df.to_csv(os.path.join(data_root, 'dscovr_jan'))
+    month = 1
+    name = 'jan'
 
-    df = load_multiple_files('wind swe', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
-    df.to_csv(os.path.join(data_root, 'wind_swe_jan'))
+    df = load_multiple_files('dscovr', datetime(year=2022, month=month, day=1),
+                             datetime(year=2022, month=month, day=4))
+    df.to_pickle(os.path.join(data_root, 'dscovr_example.dat'))
 
-    # df = load_multiple_files('wind mfi', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
-    # df.to_csv(os.path.join(data_root, 'wind_mfi_jan'))
+    df = load_multiple_files('wind swe', datetime(year=2022, month=month, day=1),
+                             datetime(year=2022, month=month, day=4))
+    df.to_pickle(os.path.join(data_root, 'wind_swe_example.dat'))
 
-    """
-    df = load_multiple_files('dscovr fc0', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
-    df.to_csv(os.path.join(data_root, 'dscovr_fc0_jan'))
+    df = load_multiple_files('wind mfi', datetime(year=2022, month=month, day=1),
+                             datetime(year=2022, month=month, day=4))
+    df.to_pickle(os.path.join(data_root, 'wind_mfi_example.dat'))
 
-    df = load_multiple_files('dscovr fc1', datetime(year=2022, month=1, day=1), datetime(year=2022, month=2, day=1))
-    df.to_csv(os.path.join(data_root, 'dscovr_fc1_jan'))
-    """
+    # df = load_multiple_files('dscovr', datetime(year=2022, month=month, day=1),
+    #                          datetime(year=2022, month=month + 1, day=1))
+    # df.to_pickle(os.path.join(data_root, f'dscovr_{name}.dat'))
+
+    # df = load_multiple_files('wind swe', datetime(year=2022, month=month, day=1),
+    #                          datetime(year=2022, month=month + 1, day=1))
+    # df.to_pickle(os.path.join(data_root, f'wind_swe_{name}.dat'))
+
+    # df = load_multiple_files('wind mfi', datetime(year=2022, month=month, day=1),
+    #                          datetime(year=2022, month=month + 1, day=1))
+    # df.to_pickle(os.path.join(data_root, f'wind_mfi_{name}.dat'))
