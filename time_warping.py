@@ -7,10 +7,13 @@ import pandas as pd
 matplotlib.use('TkAgg')
 import dtw
 
-from load_data import load_dataframe
+from load_data import load_saved_dataframe
 
 
 def get_time_vector(dscovr: pd.DataFrame, wind_mfi: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate an appropriate pairing of the DSCOVR and Wind times based on the magnetic feild data.
+    """
     resampled_dscovr = dscovr.resample('120s', on='Epoch1').mean()
     resampled_wind_mfi = wind_mfi.resample('120s', on='Epoch').mean()
 
@@ -48,15 +51,37 @@ def get_time_vector(dscovr: pd.DataFrame, wind_mfi: pd.DataFrame) -> Tuple[np.nd
     return dscovr_time, warped_wind_time
 
 
-def warp_target_values(df_wind_swe: pd.DataFrame, dscovr_time: np.ndarray,
-                       warped_wind_time: np.ndarray) -> pd.DataFrame:
-    times = df_wind_swe['Epoch']
+def warp_target_values(wind_swe: pd.DataFrame, dscovr_time: np.ndarray, warped_wind_time: np.ndarray) -> pd.DataFrame:
+    """
+    Warp the epoch times from the Wind SWE dataset to the matching times from DSCOVR.
+    """
+    wind_swe = wind_swe.copy()
+    # Remove occurrences outside the scope of the time warping
+    wind_swe = wind_swe[np.bitwise_and(wind_swe['Epoch'] > np.min(warped_wind_time),
+                                       wind_swe['Epoch'] < np.max(warped_wind_time))]
+
+    actual_wind_times = wind_swe['Epoch'].to_numpy()
+    indices = np.searchsorted(warped_wind_time, actual_wind_times)
+
+    # Calculate the fraction of each time in the segment containing it
+    fractions_in_segments = ((actual_wind_times - warped_wind_time[indices - 1])
+                             / (warped_wind_time[indices] - warped_wind_time[indices - 1]))
+
+    # Use linear interpolation to get a more accurate warping of the time
+    warped_wind_times = (dscovr_time[indices - 1]
+                         + fractions_in_segments * (dscovr_time[indices] - dscovr_time[indices - 1]))
+
+    wind_swe['Epoch_old'] = actual_wind_times
+    wind_swe['Epoch'] = warped_wind_times
+    return wind_swe
 
 
 if __name__ == '__main__':
-    df_dscovr = load_dataframe('dscovr example')
-    df_wind_mfi = load_dataframe('wind mfi example')
-    df_wind_swe = load_dataframe('wind swe example')
+    df_dscovr = load_saved_dataframe('dscovr example')
+    df_wind_mfi = load_saved_dataframe('wind mfi example')
+    df_wind_swe = load_saved_dataframe('wind swe example')
 
     df_dscovr_time, df_warped_wind_time = get_time_vector(df_dscovr, df_wind_mfi)
     df_warped_wind_swe = warp_target_values(df_wind_swe, df_dscovr_time, df_warped_wind_time)
+
+    print('end')

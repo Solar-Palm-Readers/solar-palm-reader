@@ -15,6 +15,8 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
+from load_data import create_complete_dataset
+
 # torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
 
@@ -36,11 +38,17 @@ class GRUNet(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x: torch.tensor, h: torch.tensor) -> Tuple[torch.tensor, torch.tensor]:
+        """
+        Apply the network on the given data and state.
+        """
         out, h = self.gru(x, h)
         out = self.fc(self.relu(out[:, -1]))
         return out, h
 
     def init_hidden(self, batch_size: int) -> torch.nn.Parameter:
+        """
+        Initialize the initial hidden state of the network.
+        """
         weight = next(self.parameters()).data
         hidden = weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device)
         return hidden
@@ -57,11 +65,17 @@ class LSTMNet(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x: torch.tensor, h: torch.tensor) -> torch.tensor:
+        """
+        Apply the network on the given data and state.
+        """
         out, h = self.lstm(x, h)
         out = self.fc(self.relu(out[:, -1]))
         return out, h
 
     def init_hidden(self, batch_size: int) -> Tuple[torch.nn.Parameter, torch.nn.Parameter]:
+        """
+        Initialize the initial hidden state of the network.
+        """
         weight = next(self.parameters()).data
         hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device),
                   weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device))
@@ -70,6 +84,9 @@ class LSTMNet(nn.Module):
 
 def train(train_loader: DataLoader, learn_rate: float, batch_size: int, hidden_dim: int = 256, num_epochs: int = 5,
           model_type: str = "GRU") -> nn.Module:
+    """
+    Create and train the neural network.
+    """
     # Setting common hyperparameters
     input_dim = next(iter(train_loader))[0].shape[2]
     output_dim = 1
@@ -89,7 +106,7 @@ def train(train_loader: DataLoader, learn_rate: float, batch_size: int, hidden_d
     print("Starting Training of {} model".format(model_type))
     epoch_times = []
     # Start training loop
-    for epoch in range(1, num_epochs + 1):
+    for epoch in tqdm(range(1, num_epochs + 1)):
         start_time = time.clock()
         h = model.init_hidden(batch_size)
         avg_loss = 0.
@@ -120,18 +137,23 @@ def train(train_loader: DataLoader, learn_rate: float, batch_size: int, hidden_d
 
 
 def evaluate(model: nn.Module, test_x: Dict[str, np.ndarray], test_y: Dict[str, np.ndarray],
-             label_scalers: Dict[str, MinMaxScaler]) -> Tuple[List[torch.Tensor], List[torch.Tensor], float]:
+             label_scaler: MinMaxScaler) -> Tuple[List[torch.Tensor], List[torch.Tensor], float]:
+    """
+    Evaluate the neural network on the given dataset.
+    """
     model.eval()
     outputs = []
     targets = []
     start_time = time.clock()
-    for i in test_x.keys():
-        inp = torch.from_numpy(np.array(test_x[i]))
-        labs = torch.from_numpy(np.array(test_y[i]))
-        h = model.init_hidden(inp.shape[0])
-        out, h = model(inp.to(device).float(), h)
-        outputs.append(label_scalers[i].inverse_transform(out.cpu().detach().numpy()).reshape((-1,)))
-        targets.append(label_scalers[i].inverse_transform(labs.numpy()).reshape((-1,)))
+
+    inp = torch.from_numpy(np.array(test_x))
+    labs = torch.from_numpy(np.array(test_y))
+
+    h = model.init_hidden(inp.shape[0])
+    out, h = model(inp.to(device).float(), h)
+
+    outputs.append(label_scaler.inverse_transform(out.cpu().detach().numpy()).reshape((-1,)))
+    targets.append(label_scaler.inverse_transform(labs.numpy()).reshape((-1,)))
     print("Evaluation Time: {}".format(str(time.clock() - start_time)))
 
     sMAPE = 0
@@ -149,51 +171,35 @@ def main() -> None:
 
     pd.read_csv(data_dir + 'AEP_hourly.csv').head()
 
-    label_scalers = {}
+    df = create_complete_dataset()
+    # TODO seperate the X, y
 
-    train_x = []
-    train_y = []
-    test_x = {}
-    test_y = {}
+    # Scaling the input data
+    sc = MinMaxScaler()
+    label_sc = MinMaxScaler()
+    data = sc.fit_transform(df.values)
 
-    for file in tqdm(os.listdir(data_dir)):
-        # Skipping the files we're not using
-        if file[-4:] != ".csv" or file == "pjm_hourly_est.csv":
-            continue
+    # Obtaining the Scale for the labels so that output can be re-scaled to actual value during evaluation
+    label_sc.fit(df.iloc[:, 0].values.reshape((-1, 1)))
 
-        # Store csv file in a Pandas DataFrame
-        df = pd.read_csv(data_dir + file, parse_dates=[0])
+    # Define lookback period and split inputs/labels
+    lookback = 100
+    inputs = np.zeros((len(data) - lookback, lookback, df.shape[1]))
+    labels = np.zeros(len(data) - lookback)
 
-        # Scaling the input data
-        sc = MinMaxScaler()
-        label_sc = MinMaxScaler()
-        data = sc.fit_transform(df.values)
+    for i in range(lookback, len(data)):
+        inputs[i - lookback] = data[i - lookback:i]
+        labels[i - lookback] = data[i, 0]
+    inputs = inputs.reshape((-1, lookback, df.shape[1]))
+    labels = labels.reshape((-1, 1))
 
-        # Obtaining the Scale for the labels so that output can be re-scaled to actual value during evaluation
-        label_sc.fit(df.iloc[:, 0].values.reshape((-1, 1)))
-        label_scalers[file] = label_sc
+    # Split data into train/test portions and combining all data from different files into a single array
+    test_portion = int(0.1 * len(inputs))
+    train_x = inputs[:-test_portion]
+    train_y = labels[:-test_portion]
 
-        # Define lookback period and split inputs/labels
-        lookback = 100
-        inputs = np.zeros((len(data) - lookback, lookback, df.shape[1]))
-        labels = np.zeros(len(data) - lookback)
-
-        for i in range(lookback, len(data)):
-            inputs[i - lookback] = data[i - lookback:i]
-            labels[i - lookback] = data[i, 0]
-        inputs = inputs.reshape((-1, lookback, df.shape[1]))
-        labels = labels.reshape((-1, 1))
-
-        # Split data into train/test portions and combining all data from different files into a single array
-        test_portion = int(0.1 * len(inputs))
-        if len(train_x) == 0:
-            train_x = inputs[:-test_portion]
-            train_y = labels[:-test_portion]
-        else:
-            train_x = np.concatenate((train_x, inputs[:-test_portion]))
-            train_y = np.concatenate((train_y, labels[:-test_portion]))
-        test_x[file] = (inputs[-test_portion:])
-        test_y[file] = (labels[-test_portion:])
+    test_x = (inputs[-test_portion:])
+    test_y = (labels[-test_portion:])
 
     print(train_x.shape)
 
@@ -207,9 +213,9 @@ def main() -> None:
 
     lstm_model = train(train_loader, lr, batch_size, model_type="LSTM")
 
-    evaluate(gru_model, test_x, test_y, label_scalers)
+    evaluate(gru_model, test_x, test_y, label_sc)
 
-    evaluate(lstm_model, test_x, test_y, label_scalers)
+    evaluate(lstm_model, test_x, test_y, label_sc)
 
 
 if __name__ == '__main__':

@@ -17,6 +17,9 @@ def date_to_string(date: datetime) -> str:
 
 
 def get_file(dataset: str, date: datetime) -> xr.Dataset:
+    """
+    Load a .cdf file from the given dataset for a given date.
+    """
     if dataset.lower() == "dscovr":
         file_template = dscovr_file_template
     elif dataset.lower() == "wind mfi":
@@ -32,6 +35,9 @@ def get_file(dataset: str, date: datetime) -> xr.Dataset:
 
 
 def display_columns(dat_files: list, metadata: bool = False) -> None:
+    """
+    Display column metadata.
+    """
     for f in dat_files:
         print(f.attrs['Descriptor'])
         for i in f.keys():
@@ -46,6 +52,9 @@ def display_columns(dat_files: list, metadata: bool = False) -> None:
 
 
 def to_pandas(dat: xr.Dataset, columns: list, validate_vector: np.ndarray) -> pd.DataFrame:
+    """
+    Convert a dataset to pandas DataFrame..
+    """
     df = pd.DataFrame()
     for col_name in columns:
         col = dat[col_name]
@@ -59,6 +68,9 @@ def to_pandas(dat: xr.Dataset, columns: list, validate_vector: np.ndarray) -> pd
 
 
 def add_epoch(dataset: str, df: pd.DataFrame, dat: xr.Dataset) -> None:
+    """
+    Add epoch time as a column (instead of the index in the XArray).
+    """
     if dataset.lower() == "dscovr":
         df['Epoch1'] = dat.coords['Epoch1'].data
     elif dataset.lower() == "wind mfi":
@@ -70,6 +82,9 @@ def add_epoch(dataset: str, df: pd.DataFrame, dat: xr.Dataset) -> None:
 
 
 def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
+    """
+    Load a dataset, filter bad values and convert to pandas.
+    """
     dat_file = get_file(dataset, date)
     columns = select_columns(dataset)
     validate_vector = get_validate_vector(dataset, dat_file, columns)
@@ -80,6 +95,9 @@ def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
 
 
 def select_columns(dataset: str) -> list:
+    """
+    Filter only the relevant columns.
+    """
     if dataset.lower() == "dscovr":
         columns = ['B1F1', 'B1SDF1', 'B1GSE', 'B1SDGSE']
     elif dataset.lower() == "wind mfi":
@@ -93,6 +111,9 @@ def select_columns(dataset: str) -> list:
 
 
 def create_validate_vector(dataset: str, dat: xr.Dataset) -> np.ndarray:
+    """
+    Creates a boolean array in the correct length for each dataset.
+    """
     if dataset.lower() == "dscovr":
         validate_vector = np.zeros_like(dat['B1F1'])
     elif dataset.lower() == "wind mfi":
@@ -106,6 +127,9 @@ def create_validate_vector(dataset: str, dat: xr.Dataset) -> np.ndarray:
 
 
 def get_validate_vector(dataset: str, dat: xr.Dataset, columns: list) -> np.array:
+    """
+    Check if a row is valid. Returns an array of boolean validity flags.
+    """
     validate_vector = create_validate_vector(dataset, dat)
     for col_name in columns:
         col = dat[col_name]
@@ -126,6 +150,9 @@ def get_validate_vector(dataset: str, dat: xr.Dataset, columns: list) -> np.arra
 
 
 def filter_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Filter bad rows using the validity flag and then delete it.
+    """
     df = df[df['validate_vector']]
     df = df.drop('validate_vector', axis=1)
 
@@ -133,6 +160,9 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime) -> pd.DataFrame:
+    """
+    Load a range of dates and concatenates them to a single dataframe.
+    """
     date = start_date
     df = pd.DataFrame()
     while date < stop_date:

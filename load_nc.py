@@ -17,6 +17,9 @@ def date_to_string(date: datetime) -> str:
 
 
 def get_file(dataset: str, date: datetime) -> xr.Dataset:
+    """
+    Load a .nc file from the given dataset for a given date.
+    """
     if dataset.lower() == "dscovr fc0":
         file_template = dscovr_fc0_file
         with_wildcard = True
@@ -37,6 +40,9 @@ def get_file(dataset: str, date: datetime) -> xr.Dataset:
 
 
 def display_columns(dat_files: list, metadata: bool = False) -> None:
+    """
+    Display column metadata.
+    """
     for f in dat_files:
         print(f.attrs['Descriptor'])
         for i in f.keys():
@@ -51,6 +57,9 @@ def display_columns(dat_files: list, metadata: bool = False) -> None:
 
 
 def to_pandas(dat: xr.Dataset, validate_vector: np.ndarray) -> pd.DataFrame:
+    """
+    Convert a dataset to pandas DataFrame..
+    """
     df = pd.DataFrame()
     for k in dat.variables.keys():
         col = dat.variables[k]
@@ -60,6 +69,9 @@ def to_pandas(dat: xr.Dataset, validate_vector: np.ndarray) -> pd.DataFrame:
 
 
 def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
+    """
+    Load a dataset, filter bad values and convert to pandas.
+    """
     dat_file = get_file(dataset, date)
     validate_vector = get_validate_vector(dat_file)
     df = to_pandas(dat_file, validate_vector)
@@ -68,6 +80,9 @@ def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
 
 
 def get_validate_vector(dat: xr.Dataset) -> np.array:
+    """
+    Check if a row is valid. Returns an array of boolean validity flags.
+    """
     validate_vector = np.zeros_like(dat.variables['time'][:])
     for k in dat.variables.keys():
         col = dat.variables[k]
@@ -83,6 +98,9 @@ def get_validate_vector(dat: xr.Dataset) -> np.array:
 
 
 def load_multiple_files(dataset: str, start_date: datetime, stop_date: datetime) -> pd.DataFrame:
+    """
+    Load a range of dates and concatenates them to a single dataframe.
+    """
     date = start_date
     df = pd.DataFrame()
     while date < stop_date:
