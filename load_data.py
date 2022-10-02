@@ -57,24 +57,38 @@ def display_columns(dat_files: list, metadata: bool = False) -> None:
             print(i, info, f[i].shape)
 
 
-def to_pandas(dat: xr.Dataset) -> pd.DataFrame:
+def to_pandas(dataset: str, dat: xr.Dataset) -> pd.DataFrame:
     df = pd.DataFrame()
     for k in dat.keys():
         col = dat[k]
-        if col.attrs['VAR_TYPE'] == 'metadata' or col.shape[0] == 1440:
+        if col.attrs['VAR_TYPE'] == 'metadata':
             continue
-        if col[:].ndim > 1:
+        if dataset.lower() == "wind mfi" and k != 'Epoch Time' and k != 'BF1' and k != 'BGSE':
+            continue
+        if col.data.ndim > 1:
             for c in range(col.shape[-1]):
-                df[f'{k}_{c}'] = col[:, c]
+                df[f'{k}_{c}'] = col.data[:, c]
         else:
-            df[k] = col[:].tolist()
+            df[k] = col.data
 
     return df
 
 
+def add_epoch(dataset: str, df: pd.DataFrame, dat: xr.Dataset) -> None:
+    if dataset.lower() == "dscovr":
+        df['Epoch1'] = dat.coords['Epoch1'].data
+    elif dataset.lower() == "wind mfi":
+        df['Epoch'] = dat.coords['Epoch'].data
+    elif dataset.lower() == "wind swe":
+        df['Epoch'] = dat.coords['Epoch'].data
+    else:
+        raise ValueError('Unknown Dataset')
+
+
 def load_dataframe(dataset: str, date: datetime) -> pd.DataFrame:
     dat_file = get_file(dataset, date)
-    df = to_pandas(dat_file)
+    df = to_pandas(dataset, dat_file)
+    add_epoch(dataset, df, dat_file)
     dat_file.close()
     return df
 
@@ -106,5 +120,5 @@ if __name__ == '__main__':
     # wind_swe_file = get_file_wind_swe(datetime(year=2022, month=1, day=1))
 
     # display_columns([dscovr_file, wind_mfi_file, wind_swe_file], metadata=True)
-    df = load_dataframe('dscovr', datetime(year=2022, month=1, day=1))
+    df1 = load_dataframe('dscovr', datetime(year=2022, month=1, day=1))
     print('hi')
