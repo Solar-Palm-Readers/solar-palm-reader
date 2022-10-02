@@ -3,7 +3,8 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from spacepy import pycdf
+import xarray as xr
+from cdflib import cdf_to_xarray
 
 data_root = r'data'
 dscovr_file_template = 'dscovr_h0_mag_{date_string}_v01.cdf'
@@ -15,7 +16,7 @@ def date_to_string(date: datetime) -> str:
     return date.strftime('%Y%m%d')
 
 
-def get_file(dataset: str, date: datetime) -> pycdf.CDF:
+def get_file(dataset: str, date: datetime) -> xr.Dataset:
     if dataset.lower() == "dscovr":
         file_template = dscovr_file_template
     elif dataset.lower() == "wind mfi":
@@ -27,18 +28,18 @@ def get_file(dataset: str, date: datetime) -> pycdf.CDF:
 
     file_name = str.format(file_template, date_string=date_to_string(date))
     full_file_path = os.path.join(data_root, dataset.lower(), file_name)
-    return pycdf.CDF(full_file_path)
+    return cdf_to_xarray(full_file_path, to_datetime=True, fillval_to_nan=True)
 
 
-def get_file_dscovr(date: datetime) -> pycdf.CDF:
+def get_file_dscovr(date: datetime) -> xr.Dataset:
     return get_file("dscovr", date)
 
 
-def get_file_wind_mfi(date: datetime) -> pycdf.CDF:
+def get_file_wind_mfi(date: datetime) -> xr.Dataset:
     return get_file("wind mfi", date)
 
 
-def get_file_wind_swe(date: datetime) -> pycdf.CDF:
+def get_file_wind_swe(date: datetime) -> xr.Dataset:
     return get_file("wind swe", date)
 
 
@@ -56,7 +57,7 @@ def display_columns(dat_files: list, metadata: bool = False) -> None:
             print(i, info, f[i].shape)
 
 
-def to_pandas(dat: pycdf.CDF) -> pd.DataFrame:
+def to_pandas(dat: xr.Dataset) -> pd.DataFrame:
     df = pd.DataFrame()
     for k in dat.keys():
         col = dat[k]
