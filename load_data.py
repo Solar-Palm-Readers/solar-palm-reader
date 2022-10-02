@@ -23,6 +23,6 @@ def create_channel_columns(df_dscover: pd.DataFrame) -> pd.DataFrame:
 
 def create_complete_dataset() -> pd.DataFrame:
     """
-    Concatenate the DSCOVR FC1 dataframe with the warped Wind dataframe by cross-checking the epoch times.
+    Concatenate the DSCOVR FC0 dataset with the warped Wind dataframe by cross-checking the epoch times.
     """
     raise NotImplemented()
